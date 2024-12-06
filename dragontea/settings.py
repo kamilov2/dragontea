@@ -10,7 +10,7 @@ LOG_DIR.mkdir(exist_ok=True)
 
 SECRET_KEY = 'django-insecure-zt7w#zrnt)m++g7^roiahhnxt-#&mwvn+5syp$-t118mm)2o4q'
 
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
