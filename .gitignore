@@ -1,0 +1,65 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+.ENV/
+
+# Django related
+*.log
+*.pot
+*.pyc
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3
+
+# Migrations
+**/migrations/**/ (если необходимо, исключить файлы миграции)
+
+# Django secret keys
+.env
+*.env.*
+
+# Media uploads
+media/
+uploads/
+
+# Static files
+staticfiles/
+static/
+build/
+
+# Local development
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# Node.js for Webhooks
+node_modules/
+npm-debug.log*
+
+# Logs and debugging
+*.log
+debug.log
+*.out
+
+# Deployment related
+# Note - public_wsgi should remain visible if you rely on uploads through Django
+.wsgi
+*.pyenv-version
+uwsgi.ini
+
+# Cloud storage  `.ssh` kept out of sight
+
+api updates include
