@@ -480,7 +480,7 @@ class TelegramBot:
             cafe_location = (cafe_latitude, cafe_longitude)
             distance_km = geodesic(client_location, cafe_location).km
 
-            delivery_rate_per_km = 0.1
+            delivery_rate_per_km = 3300
             delivery_cost = int(distance_km * delivery_rate_per_km)
 
             order.delivery_address = f"{user_latitude}, {user_longitude}"
