@@ -827,7 +827,7 @@ class TelegramBot:
 
         self.bot.send_message(
             chat_id=chat_id,
-            text=f"📰 <a href='{telegraph_url}'>KFC MENU</a>",
+            text=f"📰 <a href='{telegraph_url}'>MENU</a>",
             reply_markup=category_keyboard,
             parse_mode="HTML"
         )
