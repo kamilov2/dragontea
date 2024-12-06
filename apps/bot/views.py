@@ -788,7 +788,9 @@ class TelegramBot:
             reply_markup=main_menu_keyboard
         )
 
+
     def send_categories(self, chat_id, language_code):
+
         categories = Category.objects.all()
         if not categories.exists():
             self.bot.send_message(
@@ -796,6 +798,16 @@ class TelegramBot:
                 text="Menu mavjud emas." if language_code == 'uz' else "Меню отсутствуют."
             )
             return
+
+        content = "<h1>Menu</h1>\n" if language_code == 'uz' else "<h1>Меню</h1>\n"
+        for category in categories:
+            category_title = category.title_uz if language_code == 'uz' else category.title_ru
+            content += f"<p>➡️ <strong>{category_title}</strong></p>\n"
+
+
+
+
+        telegraph_url = f"https://telegra.ph/DRAGON-TEA-MENU-12-06"
 
         category_keyboard = InlineKeyboardMarkup(row_width=2)
         buttons = []
@@ -812,15 +824,14 @@ class TelegramBot:
                 callback_data="back_to_main"
             )
         )
-        logo_path = os.path.join('media', 'logo.jpg')
 
-        with open(logo_path, 'rb') as logo:
-            self.bot.send_photo(
-                chat_id=chat_id,
-                photo=logo,
-                caption="Menu tanlang:" if language_code == 'uz' else "Выберите меню:",
-                reply_markup=category_keyboard
-            )
+        self.bot.send_message(
+            chat_id=chat_id,
+            text=f"📰 <a href='{telegraph_url}'>KFC MENU</a>",
+            reply_markup=category_keyboard,
+            parse_mode="HTML"
+        )
+
 
     def send_products(self, chat_id, category_id, language_code):
         products = Product.objects.filter(category_id=category_id)
