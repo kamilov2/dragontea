@@ -102,7 +102,7 @@ class Product(models.Model):
         verbose_name=_('Title (Uzbek)'),
         help_text=_('Title in Uzbek')
     )
-  
+
     small_price = models.PositiveIntegerField(
         verbose_name=_('Small Size Price'),
         help_text=_('Price for small size in local currency'),
@@ -211,7 +211,7 @@ class Cart(models.Model):
         unique_together = ('client', 'product', 'is_small', 'is_big', 'is_hot', 'is_cold')
 
     def __str__(self):
-        return f"{self.product.title} - {self.quantity}"
+        return f"{self.product.title_ru} - {self.quantity}"
 
 
 class Order(models.Model):
