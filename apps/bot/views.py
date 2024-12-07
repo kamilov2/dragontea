@@ -21,7 +21,6 @@ logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
-
 class TelegramBot:
     def __init__(self):
         self.bot = TeleBot(os.getenv('TELEGRAM_BOT_TOKEN'))
@@ -123,7 +122,6 @@ class TelegramBot:
 
                 self.user_data[chat_id] = {'product_id': product_id}
 
-                # Определяем доступные размеры
                 size_options = []
                 if product.is_small:
                     size_options.append('small')
@@ -149,9 +147,6 @@ class TelegramBot:
                     self.bot.send_message(chat_id, size_message, reply_markup=size_keyboard)
                     self.bot.answer_callback_query(call.id)
                 else:
-                    # Если размеров нет, можно сразу обработать выбор без размера или выдать ошибку
-                    # Предположим, что если нет размеров, мы используем стандартную цену (если она есть)
-                    # Если у вас нет базовой цены - нужно дополнительно обработать этот сценарий
                     self.process_selection_without_size(chat_id, product, client)
 
             except Exception as e:
