@@ -49,6 +49,7 @@ class TelegramBot:
                     telegram_username=message.from_user.username
                 )
                 self.greet_and_ask_language(chat_id)
+
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith("close_order_"))
         def handle_close_order(call):
             order_id_str = call.data[len("close_order_"):]
@@ -57,6 +58,7 @@ class TelegramBot:
                 self.close_order(order_id, call)
             except ValueError:
                 self.bot.answer_callback_query(call.id, "Некорректный ID заказа.")
+
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith("language_"))
         def handle_language_selection(call):
             language_code = call.data.split("_")[1]
@@ -129,7 +131,6 @@ class TelegramBot:
                     size_options.append('big')
 
                 if size_options:
-                    # Генерация кнопок для размеров
                     size_keyboard = InlineKeyboardMarkup(row_width=2)
                     buttons = []
                     if 'small' in size_options:
@@ -148,7 +149,9 @@ class TelegramBot:
                     self.bot.send_message(chat_id, size_message, reply_markup=size_keyboard)
                     self.bot.answer_callback_query(call.id)
                 else:
-                    # Если размеров нет, продолжить логику без размера
+                    # Если размеров нет, можно сразу обработать выбор без размера или выдать ошибку
+                    # Предположим, что если нет размеров, мы используем стандартную цену (если она есть)
+                    # Если у вас нет базовой цены - нужно дополнительно обработать этот сценарий
                     self.process_selection_without_size(chat_id, product, client)
 
             except Exception as e:
@@ -160,38 +163,30 @@ class TelegramBot:
             try:
                 chat_id = call.message.chat.id
                 data = call.data.split("_")
-                size = data[1]  # 'small' или 'big'
+                size = data[1]
                 product_id = int(data[2])
 
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
 
-                # Устанавливаем выбранный размер
                 is_small = size == 'small'
                 is_big = size == 'big'
-                unit_price = product.small_price if is_small else product.big_price
+                unit_price = product.get_price(is_small=is_small, is_big=is_big) or 0
 
-                # Добавляем товар в корзину
                 cart_item, created = Cart.objects.get_or_create(
                     client=client,
                     product=product,
-                    defaults={
-                        'is_small': is_small,
-                        'is_big': is_big,
-                        'quantity': 1,
-                        'price': unit_price
-                    }
+                    is_small=is_small,
+                    is_big=is_big,
+                    defaults={'quantity': 1}
                 )
 
                 if not created:
-                    # Обновляем данные, если товар уже есть
                     cart_item.is_small = is_small
                     cart_item.is_big = is_big
-                    cart_item.price = unit_price
                     cart_item.save()
 
-                # Показываем детали выбранного продукта
                 self.send_product_details(
                     chat_id, client, product, cart_item.quantity,
                     is_small, is_big, False, False, cart_item.id
@@ -328,8 +323,8 @@ class TelegramBot:
 
             uzbekistan_tz = pytz.timezone('Asia/Tashkent')
             current_time = datetime.now(uzbekistan_tz).time()
-            start_time = time(6, 0, 0)  # 06:00
-            end_time = time(1, 0, 0)    # 02:00 (следующего дня)
+            start_time = time(6, 0, 0)
+            end_time = time(1, 0, 0)
 
             if not ((start_time <= current_time <= time(23, 59, 59)) or (time(0, 0, 0) <= current_time <= end_time)):
                 self.bot.answer_callback_query(
@@ -376,13 +371,14 @@ class TelegramBot:
             cart_data = []
             total_price = 0
             for item in cart_items:
-                price = item.product.price * item.quantity
+                unit_price = item.product.get_price(is_small=item.is_small, is_big=item.is_big) or 0
+                price = unit_price * item.quantity
                 total_price += price
                 cart_data.append({
                     'product_title_ru': item.product.title_ru,
                     'product_title_uz': item.product.title_uz,
                     'quantity': item.quantity,
-                    'price': item.product.price,
+                    'price': unit_price,
                     'is_small': item.is_small,
                     'is_big': item.is_big,
                     'is_hot': item.is_hot,
@@ -499,20 +495,16 @@ class TelegramBot:
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith("back_to_products_"))
         def handle_back_to_products(call):
-
             chat_id = call.message.chat.id
             message_id = call.message.message_id
 
             try:
-                # Extract category_id from callback_data
                 data_parts = call.data.split("_")
-                print(data_parts)
                 category_id = int(data_parts[3])
 
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language or 'ru'
 
-                # Call send_products with the extracted category_id
                 self.send_products(chat_id, category_id, language_code)
                 self.bot.answer_callback_query(call.id)
 
@@ -568,8 +560,8 @@ class TelegramBot:
                         f"🚘 Машина: {order.car_model} (№ {order.car_number})"
                         if client.preferred_language == 'ru'
                         else f"\n\n<b>Kuryer haqida ma'lumot:</b>\n"
-                            f"👤 Kuryer: {order.courier_name}\n"
-                            f"🚘 Mashina: {order.car_model} (№ {order.car_number})"
+                             f"👤 Kuryer: {order.courier_name}\n"
+                             f"🚘 Mashina: {order.car_model} (№ {order.car_number})"
                     )
                     order_text += courier_info
 
@@ -633,8 +625,6 @@ class TelegramBot:
 
             client.order_in_progress = None
             client.save()
-
-    # Остальные методы класса TelegramBot:
 
     def greet_and_ask_language(self, chat_id):
         self.bot.send_message(
@@ -896,6 +886,8 @@ class TelegramBot:
     def send_product_details(self, chat_id, client, product, quantity, is_small, is_big, is_hot, is_cold, cart_item_id, message_id=None):
         language_code = client.preferred_language
 
+        unit_price = product.get_price(is_small=is_small, is_big=is_big) or 0
+
         size_text = ""
         if is_small:
             size_text = f"Маленький {product.small_volume}" if language_code == 'ru' else f"Kichik {product.small_volume}"
@@ -910,13 +902,13 @@ class TelegramBot:
 
         details = (
             f"🛍️ {product.title_ru if language_code == 'ru' else product.title_uz}\n"
-            f"{'Размер' if language_code == 'ru' else 'Hajmi'}: {size_text} \n"
+            f"{'Размер' if language_code == 'ru' else 'Hajmi'}: {size_text}\n"
             f"{'Температура' if language_code == 'ru' else 'Harorati'}: {temp_text}\n"
-            f"💵 {'Цена' if language_code == 'ru' else 'Narxi'}: {product.price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
+            f"💵 {'Цена' if language_code == 'ru' else 'Narxi'}: {unit_price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
             f"📦 {'Количество' if language_code == 'ru' else 'Miqdori'}: {quantity}\n"
-            f"💰 {'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}: {product.price * quantity} {'сум' if language_code == 'ru' else 'so‘m'}\n"
+            f"💰 {'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}: {unit_price * quantity} {'сум' if language_code == 'ru' else 'so‘m'}\n"
         )
-        category_id = product.category.id
+        category_id = product.category.id if product.category else 0
 
         product_keyboard = InlineKeyboardMarkup(row_width=3)
         product_keyboard.add(
