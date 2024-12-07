@@ -102,37 +102,62 @@ class Product(models.Model):
         verbose_name=_('Title (Uzbek)'),
         help_text=_('Title in Uzbek')
     )
-    title = models.CharField(
-        max_length=155,
-        verbose_name=_('Title'),
-        help_text=_('Title')
+  
+    small_price = models.PositiveIntegerField(
+        verbose_name=_('Small Size Price'),
+        help_text=_('Price for small size in local currency'),
+        null=True,
+        blank=True
     )
-    price = models.FloatField(
-        verbose_name=_('Price'),
-        help_text=_('Price')
+    big_price = models.PositiveIntegerField(
+        verbose_name=_('Big Size Price'),
+        help_text=_('Price for big size in local currency'),
+        null=True,
+        blank=True
     )
     image = models.ImageField(
         verbose_name=_('Image'),
         help_text=_('Image'),
-
+        null=True,
+        blank=True
     )
     category = models.ForeignKey(
-        Category,
+        'Category',
         on_delete=models.SET_NULL,
         verbose_name=_('Category'),
         help_text=_('Category'),
         null=True
     )
-    is_small = models.BooleanField(default=False, verbose_name='Маленький размер')
-    is_big = models.BooleanField(default=False, verbose_name='Большой размер')
-
-    # Объемы для каждого размера
-    small_volume = models.PositiveIntegerField(default=250, verbose_name='Объем маленького размера (мл)')
-    big_volume = models.PositiveIntegerField(default=500, verbose_name='Объем большого размера (мл)')
-
-    # Опции для температуры
-    is_hot = models.BooleanField(default=False, verbose_name='Горячий')
-    is_cold = models.BooleanField(default=False, verbose_name='Холодный')
+    is_small = models.BooleanField(
+        default=False,
+        verbose_name=_('Has Small Size'),
+        help_text=_('Product has small size option')
+    )
+    is_big = models.BooleanField(
+        default=False,
+        verbose_name=_('Has Big Size'),
+        help_text=_('Product has big size option')
+    )
+    small_volume = models.PositiveIntegerField(
+        default=250,
+        verbose_name=_('Small Volume (ml)'),
+        help_text=_('Volume of small size in milliliters')
+    )
+    big_volume = models.PositiveIntegerField(
+        default=500,
+        verbose_name=_('Big Volume (ml)'),
+        help_text=_('Volume of big size in milliliters')
+    )
+    is_hot = models.BooleanField(
+        default=False,
+        verbose_name=_('Hot Option'),
+        help_text=_('Product has hot option')
+    )
+    is_cold = models.BooleanField(
+        default=False,
+        verbose_name=_('Cold Option'),
+        help_text=_('Product has cold option')
+    )
 
     class Meta:
         verbose_name = _('Product')
@@ -140,6 +165,14 @@ class Product(models.Model):
 
     def __str__(self):
         return f'{self.title_ru} / {self.title_uz}'
+
+    def get_price(self, is_small=False, is_big=False):
+        """Возвращает цену в зависимости от размера."""
+        if is_small:
+            return self.small_price
+        elif is_big:
+            return self.big_price
+        return 0
 
 
 class Cart(models.Model):
