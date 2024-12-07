@@ -790,6 +790,8 @@ class TelegramBot:
         cart_text = "🛒 Ваша корзина:\n" if language_code == 'ru' else "🛒 Savatingiz:\n"
         total_price = 0
         for item in cart_items:
+            unit_price = item.product.get_price(is_small=item.is_small, is_big=item.is_big) or 0
+            price = unit_price * item.quantity
             product_title = item.product.title_ru if language_code == 'ru' else item.product.title_uz
 
             # Добавляем текст размера
