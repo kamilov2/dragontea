@@ -1289,3 +1289,31 @@ class TelegramBot:
 
         except Exception as e:
             logger.error(f"Error in send_order_update_to_client: {e}")
+    def process_selection_without_size(self, chat_id, product, client):
+        try:
+            # Добавление продукта в корзину
+            cart_item, created = Cart.objects.get_or_create(
+                client=client,
+                product=product,
+                defaults={'quantity': 1}
+            )
+            if not created:
+                cart_item.quantity += 1
+                cart_item.save()
+    
+            # Отправка информации о продукте
+            self.send_product_details(
+                chat_id=chat_id,
+                client=client,
+                product=product,
+                quantity=cart_item.quantity,
+                is_small=False,
+                is_big=False,
+                is_hot=False,
+                is_cold=False,
+                cart_item_id=cart_item.id
+            )
+        except Exception as e:
+            logger.error(f"Error in process_selection_without_size: {e}")
+            self.bot.send_message(chat_id, "Произошла ошибка при обработке продукта.")
+
