@@ -630,6 +630,7 @@ class TelegramBot:
             reply_markup=types.ReplyKeyboardRemove()
         )
         self.ask_language(chat_id)
+
     def ask_language(self, chat_id):
         language_keyboard = InlineKeyboardMarkup()
         language_keyboard.add(
@@ -778,7 +779,6 @@ class TelegramBot:
         )
 
     def show_cart(self, chat_id, client):
-        # Исправленный подсчёт цены:
         cart_items = Cart.objects.filter(client=client, quantity__gt=0)
         language_code = client.preferred_language
 
@@ -794,13 +794,16 @@ class TelegramBot:
             price = unit_price * item.quantity
             product_title = item.product.title_ru if language_code == 'ru' else item.product.title_uz
 
+            # Добавляем текст размера
             size_text = ""
             if item.is_small:
                 size_text = f"Маленький {item.product.small_volume}" if language_code == 'ru' else f"Kichik {item.product.small_volume}"
             elif item.is_big:
                 size_text = f"Большой {item.product.big_volume}" if language_code == 'ru' else f"Katta {item.product.big_volume}"
 
+            price = item.price * item.quantity
             total_price += price
+
             cart_text += f"{product_title} ({size_text}) x {item.quantity} = {price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
 
         total_text = "Итого" if language_code == 'ru' else "Jami"
