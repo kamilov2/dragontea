@@ -809,34 +809,37 @@ class TelegramBot:
     def show_cart(self, chat_id, client):
         cart_items = Cart.objects.filter(client=client, quantity__gt=0)
         language_code = client.preferred_language
-
+    
         if not cart_items.exists():
             empty_cart_message = "Корзина пуста" if language_code == 'ru' else "Savat bo'sh"
             self.bot.send_message(chat_id=chat_id, text=empty_cart_message)
             return
-
+    
         cart_text = "🛒 Ваша корзина:\n" if language_code == 'ru' else "🛒 Savatingiz:\n"
         total_price = 0
+    
         for item in cart_items:
             unit_price = item.product.get_price(is_small=item.is_small, is_big=item.is_big) or 0
             price = unit_price * item.quantity
             product_title = item.product.title_ru if language_code == 'ru' else item.product.title_uz
-
-            # Добавляем текст размера
+    
             size_text = ""
             if item.is_small:
                 size_text = f"Маленький {item.product.small_volume}" if language_code == 'ru' else f"Kichik {item.product.small_volume}"
             elif item.is_big:
                 size_text = f"Большой {item.product.big_volume}" if language_code == 'ru' else f"Katta {item.product.big_volume}"
-
-            price = item.price * item.quantity
+    
+            # Добавляем сумму за этот товар к общей сумме
             total_price += price
-
+    
+            # Формируем текст для текущего товара
             cart_text += f"{product_title} ({size_text}) x {item.quantity} = {price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
-
+    
+        # Добавляем итоговую сумму
         total_text = "Итого" if language_code == 'ru' else "Jami"
         cart_text += f"\n{total_text}: {total_price} {'сум' if language_code == 'ru' else 'so‘m'}"
-
+    
+        # Формируем клавиатуру
         cart_keyboard = InlineKeyboardMarkup(row_width=2)
         cart_keyboard.add(
             InlineKeyboardButton(
@@ -854,7 +857,8 @@ class TelegramBot:
                 callback_data="back_to_main"
             )
         )
-
+    
+        # Отправляем сообщение с корзиной
         self.bot.send_message(chat_id, cart_text, reply_markup=cart_keyboard)
 
 
