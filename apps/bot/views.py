@@ -160,34 +160,69 @@ class TelegramBot:
                 data = call.data.split("_")
                 size = data[1]
                 product_id = int(data[2])
-
+        
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
-
-                is_small = size == 'small'
-                is_big = size == 'big'
+        
+                is_small = (size == 'small')
+                is_big = (size == 'big')
                 unit_price = product.get_price(is_small=is_small, is_big=is_big) or 0
-
+        
+                # Создаём или обновляем позицию в корзине
                 cart_item, created = Cart.objects.get_or_create(
                     client=client,
                     product=product,
-                    is_small=is_small,
-                    is_big=is_big,
                     defaults={'quantity': 1}
                 )
-
-                if not created:
-                    cart_item.is_small = is_small
-                    cart_item.is_big = is_big
-                    cart_item.save()
-
-                self.send_product_details(
-                    chat_id, client, product, cart_item.quantity,
-                    is_small, is_big, False, False, cart_item.id
-                )
+        
+                cart_item.is_small = is_small
+                cart_item.is_big = is_big
+                cart_item.save()
+        
+                # Проверяем, есть ли необходимость выбора температуры:
+                # Предполагается, что в модели продукта есть флаги, указывающие на доступность горячего или холодного варианта.
+                # Например: product.has_temperature_choice = True/False
+                # или отдельные флаги product.can_be_hot / product.can_be_cold
+                # Ниже приводится пример, где предполагается что для продукта могут быть варианты температуры.
+                # Вам нужно адаптировать под вашу логику определения температуры.
+                
+                # Если продукт может быть горячим или холодным, предлагаем выбрать температуру:
+                if product.can_be_hot or product.can_be_cold:
+                    temp_keyboard = InlineKeyboardMarkup(row_width=2)
+                    if product.can_be_hot:
+                        temp_keyboard.add(
+                            InlineKeyboardButton(
+                                "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq", 
+                                callback_data=f"temp_hot_{product_id}"
+                            )
+                        )
+                    if product.can_be_cold:
+                        temp_keyboard.add(
+                            InlineKeyboardButton(
+                                "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq", 
+                                callback_data=f"temp_cold_{product_id}"
+                            )
+                        )
+                    
+                    temp_message = "Выберите температуру:" if language_code == 'ru' else "Haroratni tanlang:"
+                    self.bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=call.message.message_id,
+                        text=temp_message,
+                        reply_markup=temp_keyboard
+                    )
+                    
+                else:
+                    # Если выбора температуры нет, сразу показываем детали товара:
+                    self.send_product_details(
+                        chat_id, client, product, cart_item.quantity,
+                        is_small, is_big, False, False, cart_item.id,
+                        message_id=call.message.message_id
+                    )
+        
                 self.bot.answer_callback_query(call.id)
-
+        
             except Exception as e:
                 logger.error(f"Error in handle_size_selection: {e}")
                 self.bot.send_message(chat_id, "Произошла ошибка при выборе размера.")
@@ -198,42 +233,31 @@ class TelegramBot:
                 chat_id = call.message.chat.id
                 data = call.data.split("_")
                 temperature = data[1]
-                product_id = data[2]
-
+                product_id = int(data[2])
+        
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
-
-                user_choice = self.user_data.get(chat_id, {})
-                size = user_choice.get('size', None)
-
-                is_small = size == 'small' if size else False
-                is_big = size == 'big' if size else False
-                is_hot = temperature == 'hot'
-                is_cold = temperature == 'cold'
-
-                cart_item, created = Cart.objects.get_or_create(
-                    client=client,
-                    product=product,
-                    is_small=is_small,
-                    is_big=is_big,
-                    is_hot=is_hot,
-                    is_cold=is_cold,
-                    defaults={'quantity': 0}
-                )
-
-                quantity = cart_item.quantity
-
+        
+                cart_item = Cart.objects.get(client=client, product=product)
+        
+                is_hot = (temperature == 'hot')
+                is_cold = (temperature == 'cold')
+        
+                cart_item.is_hot = is_hot
+                cart_item.is_cold = is_cold
+                cart_item.save()
+        
+                # Теперь показываем детали с учётом выбранных параметров:
                 self.send_product_details(
-                    chat_id, client, product, quantity,
-                    is_small, is_big, is_hot, is_cold,
-                    cart_item.id
+                    chat_id, client, product, cart_item.quantity,
+                    cart_item.is_small, cart_item.is_big, 
+                    cart_item.is_hot, cart_item.is_cold,
+                    cart_item.id,
+                    message_id=call.message.message_id
                 )
                 self.bot.answer_callback_query(call.id)
-
-                if chat_id in self.user_data:
-                    del self.user_data[chat_id]
-
+        
             except Exception as e:
                 logger.error(f"Error in handle_temp_selection: {e}")
                 error_message = "Произошла ошибка при выборе температуры." if language_code == 'ru' else "Haroratni tanlashda xatolik yuz berdi."
