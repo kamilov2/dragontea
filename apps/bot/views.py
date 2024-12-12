@@ -1295,7 +1295,7 @@ class TelegramBot:
         try:
             unit_price = product.price or 0
             price_label = f"{unit_price} {'сум' if language_code == 'ru' else 'so‘m'}"
-
+    
             cart_item, created = Cart.objects.get_or_create(
                 client=client,
                 product=product,
@@ -1304,14 +1304,14 @@ class TelegramBot:
             if not created:
                 cart_item.quantity += 1
                 cart_item.save()
-
+    
             product_details = (
                 f"🛍️ {product.title_ru if language_code == 'ru' else product.title_uz}\n"
                 f"💵 {'Цена' if language_code == 'ru' else 'Narxi'}: {price_label}\n"
                 f"📦 {'Количество' if language_code == 'ru' else 'Miqdor'}: {cart_item.quantity}\n"
                 f"💰 {'Итого' if language_code == 'ru' else 'Jami'}: {unit_price * cart_item.quantity} {'сум' if language_code == 'ru' else 'so‘m'}"
             )
-
+    
             product_keyboard = InlineKeyboardMarkup(row_width=3)
             product_keyboard.add(
                 InlineKeyboardButton("➖", callback_data=f"decrease_{cart_item.id}"),
@@ -1328,9 +1328,19 @@ class TelegramBot:
                     callback_data="back_to_categories"
                 )
             )
-
-            self.bot.send_message(chat_id, product_details, reply_markup=product_keyboard)
-
+    
+            # Проверяем наличие фото у продукта
+            if product.image and product.image.path:
+                with open(product.image.path, 'rb') as photo:
+                    self.bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=product_details,
+                        reply_markup=product_keyboard
+                    )
+            else:
+                self.bot.send_message(chat_id, product_details, reply_markup=product_keyboard)
+    
         except Exception as e:
             logger.error(f"Error in process_selection_without_size: {e}")
             error_text = "Произошла ошибка при обработке продукта." if language_code == 'ru' else "Mahsulotni qayta ishlashda xatolik yuz berdi."
