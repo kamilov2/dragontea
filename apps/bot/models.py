@@ -115,6 +115,12 @@ class Product(models.Model):
         null=True,
         blank=True
     )
+    price = models.PositiveIntegerField(
+        verbose_name=_('Price'),
+        help_text=_('Enter price'),
+        null=True,
+        blank=True
+    )
     image = models.ImageField(
         verbose_name=_('Image'),
         help_text=_('Image'),
