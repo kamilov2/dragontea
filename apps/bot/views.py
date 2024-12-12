@@ -161,9 +161,17 @@ class TelegramBot:
                 size = data[1]
                 product_id = int(data[2])
         
+                # Сначала получаем сам продукт:
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
+        
+                # Теперь определяем список доступных размеров:
+                size_options = []
+                if product.is_small:
+                    size_options.append('small')
+                if product.is_big:
+                    size_options.append('big')
         
                 is_small = (size == 'small')
                 is_big = (size == 'big')
@@ -180,24 +188,20 @@ class TelegramBot:
                 cart_item.is_big = is_big
                 cart_item.save()
         
-                # Проверяем, есть ли необходимость выбора температуры:
-                # Предполагается, что в модели продукта есть флаги, указывающие на доступность горячего или холодного варианта.
-                # Например: product.has_temperature_choice = True/False
-                # или отдельные флаги product.can_be_hot / product.can_be_cold
-                # Ниже приводится пример, где предполагается что для продукта могут быть варианты температуры.
-                # Вам нужно адаптировать под вашу логику определения температуры.
+                # Проверяем, нужна ли выбор температуры. 
+                # Предположим, что критерии выбора температуры — это флаги is_hot и is_cold.
+                # Если они существуют в продукте и можно выбирать температуру, покажем соответствующие кнопки.
                 
-                # Если продукт может быть горячим или холодным, предлагаем выбрать температуру:
-                if product.can_be_hot or product.can_be_cold:
+                if product.is_hot or product.is_cold:
                     temp_keyboard = InlineKeyboardMarkup(row_width=2)
-                    if product.can_be_hot:
+                    if product.is_hot:
                         temp_keyboard.add(
                             InlineKeyboardButton(
                                 "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq", 
                                 callback_data=f"temp_hot_{product_id}"
                             )
                         )
-                    if product.can_be_cold:
+                    if product.is_cold:
                         temp_keyboard.add(
                             InlineKeyboardButton(
                                 "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq", 
@@ -212,7 +216,6 @@ class TelegramBot:
                         text=temp_message,
                         reply_markup=temp_keyboard
                     )
-                    
                 else:
                     # Если выбора температуры нет, сразу показываем детали товара:
                     self.send_product_details(
@@ -226,6 +229,7 @@ class TelegramBot:
             except Exception as e:
                 logger.error(f"Error in handle_size_selection: {e}")
                 self.bot.send_message(chat_id, "Произошла ошибка при выборе размера.")
+
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith("temp_"))
         def handle_temp_selection(call):
