@@ -1292,18 +1292,9 @@ class TelegramBot:
             
     def process_selection_without_size(self, chat_id, product, client):
         try:
-            # Определяем цену продукта
-            if product.has_small_size or product.has_big_size or product.hot_option or product.cold_option:
-                # Если есть размеры или горячий/холодный выбор, берём соответствующие цены
-                unit_price = product.small_size_price or product.big_size_price
-            else:
-                # Если таких опций нет, используется общая цена
-                unit_price = product.small_size_price or product.big_size_price or product.default_price
-    
-            # Формируем текст цены
+            unit_price = product.price
             price_label = f"{unit_price} {'сум' if client.preferred_language == 'ru' else 'so‘m'}"
     
-            # Добавление продукта в корзину
             cart_item, created = Cart.objects.get_or_create(
                 client=client,
                 product=product,
@@ -1313,7 +1304,6 @@ class TelegramBot:
                 cart_item.quantity += 1
                 cart_item.save()
     
-            # Формирование текста продукта для отправки клиенту
             product_details = (
                 f"🛍️ {product.title_ru if client.preferred_language == 'ru' else product.title_uz}\n"
                 f"💵 {'Цена' if client.preferred_language == 'ru' else 'Narxi'}: {price_label}\n"
@@ -1339,7 +1329,6 @@ class TelegramBot:
                 )
             )
     
-            # Отправка информации клиенту
             self.bot.send_message(chat_id, product_details, reply_markup=product_keyboard)
     
         except Exception as e:
