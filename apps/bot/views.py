@@ -1290,52 +1290,5 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Error in send_order_update_to_client: {e}")
             
-    def process_selection_without_size(self, chat_id, product, client):
-        try:
-            # Используем единую цену для продукта
-            unit_price = product.small_size_price or product.big_size_price
-            price_label = f"{unit_price} {'сум' if client.preferred_language == 'ru' else 'so‘m'}"
-    
-            # Добавление продукта в корзину
-            cart_item, created = Cart.objects.get_or_create(
-                client=client,
-                product=product,
-                defaults={'quantity': 1}
-            )
-            if not created:
-                cart_item.quantity += 1
-                cart_item.save()
-    
-            # Формирование текста для отправки клиенту
-            product_details = (
-                f"🛍️ {product.title_ru if client.preferred_language == 'ru' else product.title_uz}\n"
-                f"💵 {'Цена' if client.preferred_language == 'ru' else 'Narxi'}: {price_label}\n"
-                f"📦 {'Количество' if client.preferred_language == 'ru' else 'Miqdor'}: {cart_item.quantity}\n"
-                f"💰 {'Итого' if client.preferred_language == 'ru' else 'Jami'}: {unit_price * cart_item.quantity} {'сум' if client.preferred_language == 'ru' else 'so‘m'}"
-            )
-    
-            # Клавиатура для управления корзиной
-            product_keyboard = InlineKeyboardMarkup(row_width=3)
-            product_keyboard.add(
-                InlineKeyboardButton("➖", callback_data=f"decrease_{cart_item.id}"),
-                InlineKeyboardButton(f"{cart_item.quantity}", callback_data="quantity_do_nothing"),
-                InlineKeyboardButton("➕", callback_data=f"increase_{cart_item.id}")
-            )
-            product_keyboard.add(
-                InlineKeyboardButton(
-                    "🛒 Корзина" if client.preferred_language == 'ru' else "🛒 Savat",
-                    callback_data="view_cart"
-                ),
-                InlineKeyboardButton(
-                    "🔙 Назад" if client.preferred_language == 'ru' else "🔙 Orqaga",
-                    callback_data="back_to_categories"
-                )
-            )
-    
-            # Отправка информации клиенту
-            self.bot.send_message(chat_id, product_details, reply_markup=product_keyboard)
-    
-        except Exception as e:
-            logger.error(f"Error in process_selection_without_size: {e}")
-            self.bot.send_message(chat_id, "Произошла ошибка при обработке продукта.")
+
 
