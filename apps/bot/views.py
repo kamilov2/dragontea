@@ -1026,12 +1026,13 @@ class TelegramBot:
         # Формирование текста с подробностями
         details = (
             f"🛍️ <b>{product.title_ru if language_code == 'ru' else product.title_uz}</b>\n"
-            f"💵 <b>{'Цена за единицу' if language_code == 'ru' else 'Bir dona narxi'}:</b> {unit_price:,} {'сум' if language_code == 'ru' else 'so\u2018m'}\n"
-            f"{f'<b>Размер:</b> {size_text}\n' if size_text else ''}"
-            f"{f'<b>Температура:</b> {temp_text}\n' if temp_text else ''}"
+            f"💵 <b>{'Цена за единицу' if language_code == 'ru' else 'Bir dona narxi'}:</b> {unit_price:,} {'сум' if language_code == 'ru' else 'so‘m'}\n"
+            f"{'<b>Размер:</b> ' + size_text + '\n' if size_text else ''}"
+            f"{'<b>Температура:</b> ' + temp_text + '\n' if temp_text else ''}"
             f"📦 <b>{'Количество' if language_code == 'ru' else 'Miqdori'}:</b> {quantity}\n"
-            f"💰 <b>{'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}:</b> {total_price:,} {'сум' if language_code == 'ru' else 'so\u2018m'}"
+            f"💰 <b>{'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}:</b> {total_price:,} {'сум' if language_code == 'ru' else 'so‘m'}"
         )
+
 
         # Получение ID категории для кнопки "Назад"
         category_id = product.category.id if product.category else 0
