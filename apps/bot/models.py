@@ -115,7 +115,12 @@ class Product(models.Model):
         null=True,
         blank=True
     )
-
+    price = models.PositiveIntegerField(
+        verbose_name=_('Price'),
+        help_text=_('Price in local currency'),
+        null=True,
+        blank=True
+    )
     image = models.ImageField(
         verbose_name=_('Image'),
         help_text=_('Image'),
@@ -196,15 +201,12 @@ class Cart(models.Model):
         help_text=_('Quantity'),
         default=1
     )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name=_('Created At'),
-        help_text=_('Time of cart creation')
-    )
     is_small = models.BooleanField(default=False, verbose_name='Маленький размер')
     is_big = models.BooleanField(default=False, verbose_name='Большой размер')
     is_hot = models.BooleanField(default=False, verbose_name='Горячий')
     is_cold = models.BooleanField(default=False, verbose_name='Холодный')
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = _('Cart')
