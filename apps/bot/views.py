@@ -120,17 +120,40 @@ class TelegramBot:
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
 
-                self.user_data[chat_id] = {'product_id': product_id}
-
                 size_options = []
                 if product.is_small:
                     size_options.append('small')
                 if product.is_big:
                     size_options.append('big')
 
-                if size_options:
+                temp_options = []
+                if product.is_hot:
+                    temp_options.append('hot')
+                if product.is_cold:
+                    temp_options.append('cold')
+
+                # CHANGED: Если нет параметров, сразу создаём новую запись в корзине.
+                if not size_options and not temp_options:
+                    cart_item = Cart.objects.create(  # CHANGED
+                        client=client,
+                        product=product,
+                        is_small=False,
+                        is_big=False,
+                        is_hot=False,
+                        is_cold=False,
+                        quantity=0
+                    )
+                    self.send_product_details(
+                        chat_id, client, product, cart_item.quantity,
+                        is_small=False, is_big=False, is_hot=False, is_cold=False,
+                        cart_item_id=cart_item.id
+                    )
+                    self.bot.answer_callback_query(call.id)
+                else:
+                    # Если есть варианты размера или температуры, сначала спрашиваем размер
                     size_keyboard = InlineKeyboardMarkup(row_width=2)
                     buttons = []
+
                     if 'small' in size_options:
                         buttons.append(InlineKeyboardButton(
                             f"Маленький {product.small_volume}" if language_code == 'ru' else f"Kichik {product.small_volume}",
@@ -146,8 +169,15 @@ class TelegramBot:
                     size_message = "Выберите размер:" if language_code == 'ru' else "Hajmni tanlang:"
                     self.bot.send_message(chat_id, size_message, reply_markup=size_keyboard)
                     self.bot.answer_callback_query(call.id)
-                else:
-                    self.process_selection_without_size(chat_id, product, client)
+
+                    # CHANGED: Сохраняем в user_data информацию о текущем продукте, чтобы использовать позже
+                    self.user_data[chat_id] = {
+                        'product_id': product_id,
+                        'is_small': None,
+                        'is_big': None,
+                        'is_hot': False,
+                        'is_cold': False
+                    }
 
             except Exception as e:
                 logger.error(f"Error in handle_product_selection: {e}")
@@ -160,55 +190,37 @@ class TelegramBot:
                 data = call.data.split("_")
                 size = data[1]
                 product_id = int(data[2])
-        
-                # Сначала получаем сам продукт:
+
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
-        
-                # Теперь определяем список доступных размеров:
-                size_options = []
-                if product.is_small:
-                    size_options.append('small')
-                if product.is_big:
-                    size_options.append('big')
-        
-                is_small = (size == 'small')
-                is_big = (size == 'big')
-                unit_price = product.get_price(is_small=is_small, is_big=is_big) or 0
-        
-                # Создаём или обновляем позицию в корзине
-                cart_item, created = Cart.objects.get_or_create(
-                    client=client,
-                    product=product,
-                    defaults={'quantity': 1}
-                )
-        
-                cart_item.is_small = is_small
-                cart_item.is_big = is_big
-                cart_item.save()
-        
-                # Проверяем, нужна ли выбор температуры. 
-                # Предположим, что критерии выбора температуры — это флаги is_hot и is_cold.
-                # Если они существуют в продукте и можно выбирать температуру, покажем соответствующие кнопки.
-                
+
+                # CHANGED: Сохраняем выбор размера в user_data
+                if chat_id not in self.user_data:
+                    self.user_data[chat_id] = {}
+
+                self.user_data[chat_id]['product_id'] = product_id
+                self.user_data[chat_id]['is_small'] = (size == 'small')
+                self.user_data[chat_id]['is_big'] = (size == 'big')
+
+                # Если есть выбор температуры
                 if product.is_hot or product.is_cold:
                     temp_keyboard = InlineKeyboardMarkup(row_width=2)
                     if product.is_hot:
                         temp_keyboard.add(
                             InlineKeyboardButton(
-                                "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq", 
+                                "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq",
                                 callback_data=f"temp_hot_{product_id}"
                             )
                         )
                     if product.is_cold:
                         temp_keyboard.add(
                             InlineKeyboardButton(
-                                "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq", 
+                                "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq",
                                 callback_data=f"temp_cold_{product_id}"
                             )
                         )
-                    
+
                     temp_message = "Выберите температуру:" if language_code == 'ru' else "Haroratni tanlang:"
                     self.bot.edit_message_text(
                         chat_id=chat_id,
@@ -217,19 +229,29 @@ class TelegramBot:
                         reply_markup=temp_keyboard
                     )
                 else:
-                    # Если выбора температуры нет, сразу показываем детали товара:
+                    # Если температуры выбирать не нужно, сразу создаём товар в корзине
+                    cart_item = Cart.objects.create( # CHANGED
+                        client=client,
+                        product=product,
+                        is_small=self.user_data[chat_id]['is_small'],
+                        is_big=self.user_data[chat_id]['is_big'],
+                        is_hot=False,
+                        is_cold=False,
+                        quantity=0
+                    )
+
                     self.send_product_details(
                         chat_id, client, product, cart_item.quantity,
-                        is_small, is_big, False, False, cart_item.id,
+                        cart_item.is_small, cart_item.is_big, cart_item.is_hot, cart_item.is_cold,
+                        cart_item.id,
                         message_id=call.message.message_id
                     )
-        
+
                 self.bot.answer_callback_query(call.id)
-        
+
             except Exception as e:
                 logger.error(f"Error in handle_size_selection: {e}")
                 self.bot.send_message(chat_id, "Произошла ошибка при выборе размера.")
-
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith("temp_"))
         def handle_temp_selection(call):
@@ -238,30 +260,46 @@ class TelegramBot:
                 data = call.data.split("_")
                 temperature = data[1]
                 product_id = int(data[2])
-        
+
                 product = Product.objects.get(id=product_id)
                 client = Client.objects.get(telegram_id=chat_id)
                 language_code = client.preferred_language
-        
-                cart_item = Cart.objects.get(client=client, product=product)
-        
+
+                # CHANGED: Получаем параметры из user_data, добавляем температуру и создаём новую запись в корзине
+                if chat_id not in self.user_data:
+                    self.user_data[chat_id] = {}
+
                 is_hot = (temperature == 'hot')
                 is_cold = (temperature == 'cold')
-        
-                cart_item.is_hot = is_hot
-                cart_item.is_cold = is_cold
-                cart_item.save()
-        
-                # Теперь показываем детали с учётом выбранных параметров:
+
+                self.user_data[chat_id]['is_hot'] = is_hot
+                self.user_data[chat_id]['is_cold'] = is_cold
+
+                # Создаём товар в корзине
+                cart_item = Cart.objects.create( # CHANGED
+                    client=client,
+                    product=product,
+                    is_small=self.user_data[chat_id]['is_small'],
+                    is_big=self.user_data[chat_id]['is_big'],
+                    is_hot=self.user_data[chat_id]['is_hot'],
+                    is_cold=self.user_data[chat_id]['is_cold'],
+                    quantity=0
+                )
+
+                # Показываем детали продукта
                 self.send_product_details(
                     chat_id, client, product, cart_item.quantity,
-                    cart_item.is_small, cart_item.is_big, 
+                    cart_item.is_small, cart_item.is_big,
                     cart_item.is_hot, cart_item.is_cold,
                     cart_item.id,
                     message_id=call.message.message_id
                 )
+
+                # Очищаем данные
+                del self.user_data[chat_id]
+
                 self.bot.answer_callback_query(call.id)
-        
+
             except Exception as e:
                 logger.error(f"Error in handle_temp_selection: {e}")
                 error_message = "Произошла ошибка при выборе температуры." if language_code == 'ru' else "Haroratni tanlashda xatolik yuz berdi."
@@ -314,6 +352,22 @@ class TelegramBot:
                 self.show_cart(chat_id, client)
             except Client.DoesNotExist:
                 self.bot.send_message(chat_id=chat_id, text="Пожалуйста, начните с команды /start.")
+
+        @self.bot.callback_query_handler(func=lambda call: call.data == "view_cart")
+        def view_cart(call):
+            chat_id = call.message.chat.id
+            try:
+                client = Client.objects.get(telegram_id=chat_id)
+            except Client.DoesNotExist:
+                self.bot.answer_callback_query(
+                    call.id,
+                    text="Клиент не найден",
+                    show_alert=True
+                )
+                return
+
+            self.show_cart(chat_id, client)
+            self.bot.answer_callback_query(call.id)
 
         @self.bot.callback_query_handler(func=lambda call: call.data == "view_cart")
         def view_cart(call):
@@ -809,36 +863,72 @@ class TelegramBot:
     def show_cart(self, chat_id, client):
         cart_items = Cart.objects.filter(client=client, quantity__gt=0)
         language_code = client.preferred_language
-    
+
         if not cart_items.exists():
             empty_cart_message = "Корзина пуста" if language_code == 'ru' else "Savat bo'sh"
             self.bot.send_message(chat_id=chat_id, text=empty_cart_message)
             return
-    
+
         cart_text = "🛒 Ваша корзина:\n" if language_code == 'ru' else "🛒 Savatingiz:\n"
         total_price = 0
-    
+
         for item in cart_items:
-            unit_price = item.product.get_price(is_small=item.is_small, is_big=item.is_big) or 0
+            # Определяем цену на основе размера
+            if item.is_small:
+                unit_price = item.product.small_price or item.product.price
+            elif item.is_big:
+                unit_price = item.product.big_price or item.product.price
+            else:
+                unit_price = item.product.price or 0
+
+            # Если размер не выбран, назначаем по умолчанию маленький или большой размер
+            if not item.is_small and not item.is_big:
+                if item.product.is_small:
+                    item.is_small = True
+                    unit_price = item.product.small_price or item.product.price
+                elif item.product.is_big:
+                    item.is_big = True
+                    unit_price = item.product.big_price or item.product.price
+
+            # Если температура не выбрана, назначаем по умолчанию горячий или холодный
+            if not item.is_hot and not item.is_cold:
+                if item.product.is_hot:
+                    item.is_hot = True
+                elif item.product.is_cold:
+                    item.is_cold = True
+
+            item.save()
+
+            # Рассчитываем стоимость
             price = unit_price * item.quantity
+            total_price += price
+
+            # Название продукта
             product_title = item.product.title_ru if language_code == 'ru' else item.product.title_uz
-    
+
+            # Описание размера
             size_text = ""
             if item.is_small:
                 size_text = f"Маленький {item.product.small_volume}" if language_code == 'ru' else f"Kichik {item.product.small_volume}"
             elif item.is_big:
                 size_text = f"Большой {item.product.big_volume}" if language_code == 'ru' else f"Katta {item.product.big_volume}"
-    
-            # Добавляем сумму за этот товар к общей сумме
-            total_price += price
-    
-            # Формируем текст для текущего товара
-            cart_text += f"{product_title} ({size_text}) x {item.quantity} = {price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
-    
+
+            # Описание температуры
+            temp_text = ""
+            if item.is_hot:
+                temp_text = "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq"
+            elif item.is_cold:
+                temp_text = "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq"
+
+            # Формируем строку для текущего товара
+            cart_text += (
+                f"{product_title} ({size_text}, {temp_text}) x {item.quantity} = {price:,} {'сум' if language_code == 'ru' else 'so‘m'}\n"
+            )
+
         # Добавляем итоговую сумму
         total_text = "Итого" if language_code == 'ru' else "Jami"
-        cart_text += f"\n{total_text}: {total_price} {'сум' if language_code == 'ru' else 'so‘m'}"
-    
+        cart_text += f"\n{total_text}: {total_price:,} {'сум' if language_code == 'ru' else 'so‘m'}"
+
         # Формируем клавиатуру
         cart_keyboard = InlineKeyboardMarkup(row_width=2)
         cart_keyboard.add(
@@ -857,7 +947,7 @@ class TelegramBot:
                 callback_data="back_to_main"
             )
         )
-    
+
         # Отправляем сообщение с корзиной
         self.bot.send_message(chat_id, cart_text, reply_markup=cart_keyboard)
 
@@ -915,30 +1005,38 @@ class TelegramBot:
     def send_product_details(self, chat_id, client, product, quantity, is_small, is_big, is_hot, is_cold, cart_item_id, message_id=None):
         language_code = client.preferred_language
 
-        unit_price = product.get_price(is_small=is_small, is_big=is_big) or 0
-
+        # Описание размера
         size_text = ""
         if is_small:
             size_text = f"Маленький {product.small_volume}" if language_code == 'ru' else f"Kichik {product.small_volume}"
         elif is_big:
             size_text = f"Большой {product.big_volume}" if language_code == 'ru' else f"Katta {product.big_volume}"
 
+        # Описание температуры
         temp_text = ""
         if is_hot:
             temp_text = "🔥 Горячий" if language_code == 'ru' else "🔥 Issiq"
         elif is_cold:
             temp_text = "❄️ Холодный" if language_code == 'ru' else "❄️ Sovuq"
 
+        # Цена за единицу и общая стоимость
+        unit_price = product.get_price(is_small=is_small, is_big=is_big) or product.price
+        total_price = unit_price * quantity
+
+        # Формирование текста с подробностями
         details = (
-            f"🛍️ {product.title_ru if language_code == 'ru' else product.title_uz}\n"
-            f"{'Размер' if language_code == 'ru' else 'Hajmi'}: {size_text}\n"
-            f"{'Температура' if language_code == 'ru' else 'Harorati'}: {temp_text}\n"
-            f"💵 {'Цена' if language_code == 'ru' else 'Narxi'}: {unit_price} {'сум' if language_code == 'ru' else 'so‘m'}\n"
-            f"📦 {'Количество' if language_code == 'ru' else 'Miqdori'}: {quantity}\n"
-            f"💰 {'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}: {unit_price * quantity} {'сум' if language_code == 'ru' else 'so‘m'}\n"
+            f"🛍️ <b>{product.title_ru if language_code == 'ru' else product.title_uz}</b>\n"
+            f"💵 <b>{'Цена за единицу' if language_code == 'ru' else 'Bir dona narxi'}:</b> {unit_price:,} {'сум' if language_code == 'ru' else 'so\u2018m'}\n"
+            f"{f'<b>Размер:</b> {size_text}\n' if size_text else ''}"
+            f"{f'<b>Температура:</b> {temp_text}\n' if temp_text else ''}"
+            f"📦 <b>{'Количество' if language_code == 'ru' else 'Miqdori'}:</b> {quantity}\n"
+            f"💰 <b>{'Общая стоимость' if language_code == 'ru' else 'Umumiy narxi'}:</b> {total_price:,} {'сум' if language_code == 'ru' else 'so\u2018m'}"
         )
+
+        # Получение ID категории для кнопки "Назад"
         category_id = product.category.id if product.category else 0
 
+        # Создание клавиатуры
         product_keyboard = InlineKeyboardMarkup(row_width=3)
         product_keyboard.add(
             InlineKeyboardButton("➖", callback_data=f"decrease_{cart_item_id}"),
@@ -956,14 +1054,16 @@ class TelegramBot:
             )
         )
 
+        # Если есть изображение продукта, отправляем его
         if product.image:
             photo = open(product.image.path, 'rb')
         else:
             photo = None
 
+        # Обновляем сообщение или отправляем новое
         if message_id:
             if photo:
-                media = types.InputMediaPhoto(media=photo, caption=details)
+                media = types.InputMediaPhoto(media=photo, caption=details, parse_mode='HTML')
                 self.bot.edit_message_media(
                     media=media,
                     chat_id=chat_id,
@@ -976,7 +1076,8 @@ class TelegramBot:
                     chat_id=chat_id,
                     message_id=message_id,
                     caption=details,
-                    reply_markup=product_keyboard
+                    reply_markup=product_keyboard,
+                    parse_mode='HTML'
                 )
         else:
             if photo:
@@ -984,15 +1085,18 @@ class TelegramBot:
                     chat_id=chat_id,
                     photo=photo,
                     caption=details,
-                    reply_markup=product_keyboard
+                    reply_markup=product_keyboard,
+                    parse_mode='HTML'
                 )
                 photo.close()
             else:
                 self.bot.send_message(
                     chat_id=chat_id,
                     text=details,
-                    reply_markup=product_keyboard
+                    reply_markup=product_keyboard,
+                    parse_mode='HTML'
                 )
+
     def format_order_text(self, order, language_code, cart_data=None, is_admin=False):
         status_display = {
             'ru': {
